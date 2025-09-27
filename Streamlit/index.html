@@ -1,4 +1,26 @@
-<script>
+<!DOCTYPE html>
+<html>
+<head>
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <script src="https://unpkg.com/satellite.js/dist/satellite.min.js"></script>
+</head>
+<body>
+  <h2>Real-Time Satellite Orbit Plotter</h2>
+
+  <p>Paste multiple TLEs (name + 2 lines per satellite):</p>
+  <textarea id="tleInput" rows="12" cols="80">ISS (ZARYA)
+1 25544U 98067A   24231.52626736  .00016717  00000-0  30429-3 0  9991
+2 25544  51.6440  84.5455 0006726  45.7158  63.2493 15.49935690466779
+
+CSS (TIANHE)
+1 48274U 21035A   25236.91221897  .00021444  00000+0  27720-3 0  9998
+2 48274  41.4658 324.1791 0006288 228.9562 131.0733 15.58407520246872</textarea>
+  <br>
+  <button onclick="startTracking()">Start Tracking</button>
+
+  <div id="orbitPlot" style="width:100%;height:700px;margin-top:20px;"></div>
+
+  <script>
   let satellites = [];
   let intervalId;
 
