@@ -5,23 +5,35 @@
 </head>
 <body>
   <h2>Satellite Orbit Plotter</h2>
-  <div id="orbitPlot" style="width:100%;height:600px;"></div>
+
+  <p>Paste your 3-line TLE below (name + 2 lines), then click Plot:</p>
+  <textarea id="tleInput" rows="5" cols="80">ISS (ZARYA)
+1 25544U 98067A   24231.52626736  .00016717  00000-0  30429-3 0  9991
+2 25544  51.6440  84.5455 0006726  45.7158  63.2493 15.49935690466779</textarea>
+  <br>
+  <button onclick="plotOrbit()">Plot Orbit</button>
+
+  <div id="orbitPlot" style="width:100%;height:600px;margin-top:20px;"></div>
 
   <script>
-    async function fetchOrbit() {
-      const response = await fetch("http://127.0.0.1:8000/orbit", {
+    async function plotOrbit() {
+      const tleText = document.getElementById("tleInput").value.trim().split("\n");
+
+      if (tleText.length < 3) {
+        alert("Please provide 3 lines: name, line1, line2");
+        return;
+      }
+
+      const response = await fetch("https://orbit-render.onrender.com/orbit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          tle_lines: [
-            "ISS (ZARYA)",
-            "1 25544U 98067A   24231.52626736  .00016717  00000-0  30429-3 0  9991",
-            "2 25544  51.6440  84.5455 0006726  45.7158  63.2493 15.49935690466779"
-          ],
+          tle_lines: tleText,
           duration_minutes: 90,
           step_minutes: 5
         })
       });
+
       const data = await response.json();
       const positions = data.positions;
 
@@ -39,8 +51,6 @@
         scene: { xaxis:{title:'X'}, yaxis:{title:'Y'}, zaxis:{title:'Z'} }
       });
     }
-
-    fetchOrbit();
   </script>
 </body>
 </html>
