@@ -5,10 +5,10 @@
   <script src="https://unpkg.com/satellite.js/dist/satellite.min.js"></script>
 </head>
 <body>
-  <h2>Satellite Orbit Plotter (Browser-side with satellite.js)</h2>
+  <h2>Real-Time Satellite Orbit Plotter</h2>
 
   <p>Paste multiple TLEs (name + 2 lines per satellite):</p>
-  <textarea id="tleInput" rows="10" cols="80">ISS (ZARYA)
+  <textarea id="tleInput" rows="12" cols="80">ISS (ZARYA)
 1 25544U 98067A   24231.52626736  .00016717  00000-0  30429-3 0  9991
 2 25544  51.6440  84.5455 0006726  45.7158  63.2493 15.49935690466779
 
@@ -16,56 +16,93 @@ CSS (TIANHE)
 1 48274U 21035A   25236.91221897  .00021444  00000+0  27720-3 0  9998
 2 48274  41.4658 324.1791 0006288 228.9562 131.0733 15.58407520246872</textarea>
   <br>
-  <button onclick="plotOrbits()">Plot Orbits</button>
+  <button onclick="startTracking()">Start Tracking</button>
 
   <div id="orbitPlot" style="width:100%;height:700px;margin-top:20px;"></div>
 
   <script>
-    function propagateOrbit(tleLine1, tleLine2, minutes=90, step=5) {
-      const satrec = satellite.twoline2satrec(tleLine1, tleLine2);
+    let satellites = [];
+    let intervalId;
+
+    function parseTLEs(tleText) {
+      const lines = tleText.trim().split("\n");
+      const sats = [];
+      for (let i = 0; i < lines.length; i += 3) {
+        if (i + 2 >= lines.length) break;
+        const name = lines[i].trim();
+        const line1 = lines[i+1].trim();
+        const line2 = lines[i+2].trim();
+        const satrec = satellite.twoline2satrec(line1, line2);
+        sats.push({ name, satrec });
+      }
+      return sats;
+    }
+
+    function propagatePosition(satrec, time) {
+      const pv = satellite.propagate(satrec, time);
+      if (!pv.position) return null;
+      const gmst = satellite.gstime(time);
+      return satellite.eciToEcf(pv.position, gmst);
+    }
+
+    function computeOrbitPath(satrec, minutes=90, step=5) {
       const now = new Date();
-
-      const times = [];
       const xs = [], ys = [], zs = [];
-
       for (let m = 0; m <= minutes; m += step) {
-        const time = new Date(now.getTime() + m * 60000);
-        const gmst = satellite.gstime(time);
-        const eci = satellite.propagate(satrec, time);
-        if (eci.position) {
-          const posGd = satellite.eciToEcf(eci.position, gmst);
-          xs.push(posGd.x); ys.push(posGd.y); zs.push(posGd.z);
-          times.push(time.toISOString());
+        const future = new Date(now.getTime() + m*60000);
+        const ecf = propagatePosition(satrec, future);
+        if (ecf) {
+          xs.push(ecf.x); ys.push(ecf.y); zs.push(ecf.z);
         }
       }
       return { xs, ys, zs };
     }
 
-    function plotOrbits() {
-      const tleText = document.getElementById("tleInput").value.trim().split("\n");
+    function updatePlot() {
+      const now = new Date();
       const traces = [];
 
-      for (let i = 0; i < tleText.length; i += 3) {
-        if (i + 2 >= tleText.length) break;
-        const name = tleText[i].trim();
-        const line1 = tleText[i+1].trim();
-        const line2 = tleText[i+2].trim();
+      satellites.forEach(sat => {
+        // current position
+        const ecf = propagatePosition(sat.satrec, now);
+        if (ecf) {
+          traces.push({
+            x: [ecf.x],
+            y: [ecf.y],
+            z: [ecf.z],
+            mode: 'markers',
+            type: 'scatter3d',
+            name: sat.name + " (current)",
+            marker: { size: 5, color: 'red' }
+          });
+        }
 
-        const orbit = propagateOrbit(line1, line2, 180, 10); // 3 hours, 10 min step
+        // orbit path
+        const path = computeOrbitPath(sat.satrec, 180, 10); // 3 hrs ahead
         traces.push({
-          x: orbit.xs,
-          y: orbit.ys,
-          z: orbit.zs,
+          x: path.xs,
+          y: path.ys,
+          z: path.zs,
           mode: 'lines',
           type: 'scatter3d',
-          name: name
+          name: sat.name + " (orbit)",
+          line: { width: 2 }
         });
-      }
+      });
 
       Plotly.newPlot('orbitPlot', traces, {
-        title: "Orbits",
-        scene: {xaxis:{title:"X"}, yaxis:{title:"Y"}, zaxis:{title:"Z"}}
+        title: "Real-Time Satellite Positions + Orbits",
+        scene: { xaxis:{title:"X"}, yaxis:{title:"Y"}, zaxis:{title:"Z"} }
       });
+    }
+
+    function startTracking() {
+      const tleText = document.getElementById("tleInput").value;
+      satellites = parseTLEs(tleText);
+
+      if (intervalId) clearInterval(intervalId);
+      updatePlot();  // immediate draw
+      intervalId = setInterval(updatePlot, 5000); // refresh every 5 sec
     }
   </script>
 </body>
