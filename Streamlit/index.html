@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+  <h2>Satellite Orbit Plotter</h2>
+  <div id="orbitPlot" style="width:100%;height:600px;"></div>
+
+  <script>
+    async function fetchOrbit() {
+      const response = await fetch("http://127.0.0.1:8000/orbit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tle_lines: [
+            "ISS (ZARYA)",
+            "1 25544U 98067A   24231.52626736  .00016717  00000-0  30429-3 0  9991",
+            "2 25544  51.6440  84.5455 0006726  45.7158  63.2493 15.49935690466779"
+          ],
+          duration_minutes: 90,
+          step_minutes: 5
+        })
+      });
+      const data = await response.json();
+      const positions = data.positions;
+
+      const trace = {
+        x: positions.map(p => p.x),
+        y: positions.map(p => p.y),
+        z: positions.map(p => p.z),
+        mode: 'lines',
+        type: 'scatter3d',
+        line: { color: 'blue' }
+      };
+
+      Plotly.newPlot('orbitPlot', [trace], {
+        title: data.name,
+        scene: { xaxis:{title:'X'}, yaxis:{title:'Y'}, zaxis:{title:'Z'} }
+      });
+    }
+
+    fetchOrbit();
+  </script>
+</body>
+</html>
