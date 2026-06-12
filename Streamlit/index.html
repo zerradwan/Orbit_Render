@@ -3,9 +3,10 @@
 <head>
   <meta charset="utf-8">
   <title>Satellite Tracker with CesiumJS</title>
-  <script src="https://unpkg.com/cesium/Build/Cesium/Cesium.js"></script>
-  <link href="https://unpkg.com/cesium/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
-  <script src="https://unpkg.com/satellite.js/dist/satellite.min.js"></script>
+  <!-- Versions are pinned: unpinned URLs broke when satellite.js v7 removed its browser (UMD) build -->
+  <script src="https://unpkg.com/cesium@1.142.0/Build/Cesium/Cesium.js"></script>
+  <link href="https://unpkg.com/cesium@1.142.0/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+  <script src="https://unpkg.com/satellite.js@5.0.0/dist/satellite.min.js"></script>
   <style>
     html, body, #cesiumContainer {
       width: 100%; height: 100%; margin: 0; padding: 0; overflow: hidden;
@@ -21,8 +22,8 @@
 </head>
 <body>
   <textarea id="tleInput">ISS (ZARYA)
-1 25544U 98067A   24231.52626736  .00016717  00000-0  30429-3 0  9991
-2 25544  51.6440  84.5455 0006726  45.7158  63.2493 15.49935690466779</textarea>
+1 25544U 98067A   26162.96453450  .00008067  00000+0  15344-3 0  9993
+2 25544  51.6334 325.9414 0004931 175.6343 184.4689 15.49182446570947</textarea>
   <button id="startBtn">Start Tracking</button>
 
   <div id="cesiumContainer"></div>
@@ -31,10 +32,18 @@
     const viewer = new Cesium.Viewer("cesiumContainer", {
       timeline: false,
       animation: false,
-      baseLayerPicker: false
+      baseLayerPicker: false,
+      geocoder: false,
+      // Use the offline imagery bundled with Cesium so no Ion access token is needed
+      baseLayer: Cesium.ImageryLayer.fromProviderAsync(
+        Cesium.TileMapServiceImageryProvider.fromUrl(
+          Cesium.buildModuleUrl("Assets/Textures/NaturalEarthII")
+        )
+      )
     });
 
     let satellites = [];
+    let updateTimer = null;
 
     function parseTLEs(text) {
       const lines = text.trim().split("\n").map(l => l.trim()).filter(l => l.length > 0);
@@ -87,10 +96,18 @@
     }
 
     document.getElementById("startBtn").addEventListener("click", () => {
+      // Reset any previous tracking session
+      if (updateTimer) clearInterval(updateTimer);
+      viewer.entities.removeAll();
+
       satellites = parseTLEs(document.getElementById("tleInput").value);
+      if (satellites.length === 0) {
+        alert("No valid TLEs found. Paste 3 lines per satellite: name, line 1, line 2.");
+        return;
+      }
       addSatellites();
-      // update once per second
-      setInterval(updateSatellites, 1000);
+      updateSatellites(); // show immediately, then update once per second
+      updateTimer = setInterval(updateSatellites, 1000);
     });
   </script>
 </body>
